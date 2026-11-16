@@ -1,0 +1,39 @@
+{
+  "versi_model": "1.0.0",
+  "nama_model": "Logistic Regression + fitur",
+  "dibuat": "2026-11-15",
+  "fitur_request": [
+    "tanggal_pickup",
+    "jam_pickup",
+    "kota_tujuan",
+    "jarak_km",
+    "jumlah_transit",
+    "layanan",
+    "janji_hari",
+    "berat_kg",
+    "metode_bayar",
+    "cuaca_saat_pickup",
+    "volume_hub_hari"
+  ],
+  "target": "terlambat",
+  "threshold": 0.11,
+  "batas_prioritas": 0.5,
+  "pakai_volume": true,
+  "metrik_validasi": {
+    "pr_auc": 0.662
+  },
+  "metrik_test": {
+    "pr_auc": 0.378,
+    "recall": 0.772,
+    "precision": 0.238
+  },
+  "asumsi_biaya": {
+    "FN": 50000,
+    "FP": 5000
+  },
+  "versi_library": {
+    "python": "3.13.18",
+    "sklearn": "1.6.1",
+    "pandas": "2.2.3"
+  }
+}
