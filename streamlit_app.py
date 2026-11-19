@@ -1,8 +1,4 @@
-"""
-streamlit_app.py
-Aplikasi Web Prediksi Keterlambatan Pengiriman Paket — Hub Bandung.
-Mandiri (self-contained) dan kompatibel otomatis dengan core.py maupun model_terlambat.joblib.
-"""
+
 
 from __future__ import annotations
 
