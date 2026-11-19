@@ -1,6 +1,20 @@
 
+# Virtual environment
 .venv/
+venv/
+
+# Python cache
 __pycache__/
-*.pyc
-.ipynb_checkpoints/
-.DS_Store
+*.py[cod]
+
+# Environment dan secrets
+.env
+.streamlit/secrets.toml
+
+# Dataset
+*.csv
+*.xlsx
+*.xls
+
+# Temporary files
+*.log
