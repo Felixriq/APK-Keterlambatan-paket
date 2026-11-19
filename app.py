@@ -1,18 +1,16 @@
 
 import json
 import joblib
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
 from pathlib import Path
-from datetime import date
-
 from src.features import tambah_fitur, periksa_request
 
 
-# =====================================================
-# KONFIGURASI HALAMAN
-# =====================================================
+# =========================================================
+# 1. KONFIGURASI HALAMAN
+# =========================================================
 
 st.set_page_config(
     page_title="Prediksi Keterlambatan Paket",
@@ -20,20 +18,15 @@ st.set_page_config(
     layout="wide"
 )
 
-
-# =====================================================
-# LOKASI FILE
-# =====================================================
-
 BASE_DIR = Path(__file__).resolve().parent
 
 MODEL_PATH = BASE_DIR / "artifacts" / "model.joblib"
 METADATA_PATH = BASE_DIR / "artifacts" / "metadata.json"
 
 
-# =====================================================
-# LOAD MODEL DAN METADATA
-# =====================================================
+# =========================================================
+# 2. LOAD MODEL DAN METADATA
+# =========================================================
 
 @st.cache_resource
 def load_model():
@@ -48,430 +41,480 @@ def load_metadata():
 
 try:
     model = load_model()
-    meta = load_metadata()
+    metadata = load_metadata()
 
 except Exception as e:
     st.error(f"Gagal memuat model atau metadata: {e}")
     st.stop()
 
 
-# =====================================================
-# INFORMASI MODEL
-# =====================================================
+# =========================================================
+# 3. KONFIGURASI MODEL
+# =========================================================
 
-THRESHOLD = meta["threshold"]
-BATAS_PRIORITAS = meta["batas_prioritas"]
+THRESHOLD = float(metadata["threshold"])
+BATAS_PRIORITAS = float(metadata["batas_prioritas"])
 
-MEDIAN_JARAK_KOTA = meta["median_jarak_kota"]
-MEDIAN_JARAK_GLOBAL = meta["median_jarak_global"]
+MEDIAN_JARAK_KOTA = metadata["median_jarak_kota"]
+MEDIAN_JARAK_GLOBAL = metadata["median_jarak_global"]
 
-
-# =====================================================
-# KATEGORI INPUT
-# =====================================================
-
-KOTA = [
-    "Bali",
-    "Balikpapan",
-    "Bekasi",
-    "Bogor",
-    "Cirebon",
-    "Denpasar",
-    "Jakarta",
-    "Makassar",
-    "Malang",
-    "Medan",
-    "Palembang",
-    "Pontianak",
-    "Semarang",
-    "Surabaya",
-    "Tasikmalaya",
-    "Yogyakarta"
-]
-
-LAYANAN = [
-    "EXPRESS",
-    "HEMAT",
-    "REG"
-]
-
-METODE_BAYAR = [
-    "COD",
-    "non_COD"
-]
-
-CUACA = [
-    "berawan",
-    "cerah",
-    "hujan",
-    "hujan_lebat",
-    "tidak_diketahui"
-]
+FITUR_REQUEST = metadata["fitur_request"]
 
 
-# =====================================================
-# JUDUL APLIKASI
-# =====================================================
+# =========================================================
+# 4. FUNGSI PREPROCESSING DAN PREDIKSI
+# =========================================================
 
-st.title("📦 Prediksi Keterlambatan Pengiriman Paket")
+def proses_prediksi(request):
+
+    # Membuat DataFrame sesuai fitur request
+    df = pd.DataFrame(
+        [request],
+        columns=FITUR_REQUEST
+    )
+
+    # Validasi data input
+    masalah, peringatan = periksa_request(request)
+
+    if masalah:
+        return None, masalah, peringatan
+
+    # Feature engineering
+    df_fitur = tambah_fitur(df)
+
+    # Mengambil kota tujuan yang sudah dinormalisasi
+    kota = df_fitur["kota_tujuan"].iloc[0]
+
+    # Menentukan median jarak berdasarkan kota
+    if kota in MEDIAN_JARAK_KOTA:
+        median_jarak = MEDIAN_JARAK_KOTA[kota]
+        sumber_jarak = f"Median kota {kota}"
+    else:
+        median_jarak = MEDIAN_JARAK_GLOBAL
+        sumber_jarak = "Median jarak global"
+
+    # Imputasi jarak jika tidak diketahui
+    jarak_diimputasi = pd.isna(request["jarak_km"])
+
+    df_fitur["jarak_km"] = df_fitur["jarak_km"].fillna(
+        median_jarak
+    )
+
+    # Menghitung ulang fitur turunan setelah imputasi
+    df_fitur["hari_per_1000km"] = (
+        df_fitur["janji_hari"] /
+        (df_fitur["jarak_km"] / 1000)
+    )
+
+    # Mengambil fitur sesuai Pipeline model
+    preprocessor = model.named_steps["preprocessor"]
+
+    fitur_numerik = list(
+        preprocessor.transformers_[0][2]
+    )
+
+    fitur_kategorikal = list(
+        preprocessor.transformers_[1][2]
+    )
+
+    fitur_model = fitur_numerik + fitur_kategorikal
+
+    X = df_fitur[fitur_model]
+
+    # Mengambil classifier
+    classifier = model.named_steps["classifier"]
+
+    # Memastikan kelas terlambat tersedia
+    kelas = list(classifier.classes_)
+
+    if 1 not in kelas:
+        raise ValueError(
+            "Model tidak memiliki kelas positif 1 (terlambat)."
+        )
+
+    indeks_terlambat = kelas.index(1)
+
+    # Menghitung probabilitas keterlambatan
+    probabilitas = model.predict_proba(X)[0][indeks_terlambat]
+
+    # Keputusan berdasarkan threshold
+    prediksi = int(probabilitas >= THRESHOLD)
+
+    # Menentukan rekomendasi
+    if probabilitas >= BATAS_PRIORITAS:
+
+        rekomendasi = "PRIORITAS TINGGI"
+
+        keterangan = (
+            "Paket memiliki risiko keterlambatan tinggi. "
+            "Segera lakukan tindak lanjut."
+        )
+
+    elif prediksi == 1:
+
+        rekomendasi = "KABARI PELANGGAN"
+
+        keterangan = (
+            "Paket terindikasi berisiko terlambat. "
+            "Informasikan potensi keterlambatan kepada pelanggan."
+        )
+
+    else:
+
+        rekomendasi = "PEMANTAUAN NORMAL"
+
+        keterangan = (
+            "Risiko keterlambatan berada di bawah threshold. "
+            "Paket dapat dipantau melalui proses operasional normal."
+        )
+
+    # Menyimpan hasil prediksi
+    hasil = {
+        "probabilitas": probabilitas,
+        "prediksi": prediksi,
+        "rekomendasi": rekomendasi,
+        "keterangan": keterangan,
+        "jarak_digunakan": df_fitur["jarak_km"].iloc[0],
+        "jarak_diimputasi": jarak_diimputasi,
+        "sumber_jarak": sumber_jarak
+    }
+
+    return hasil, masalah, peringatan
+
+
+# =========================================================
+# 5. HEADER APLIKASI
+# =========================================================
+
+st.title("📦 Sistem Prediksi Keterlambatan Paket")
 
 st.write(
-    "Aplikasi ini digunakan untuk memperkirakan kemungkinan "
-    "paket mengalami keterlambatan berdasarkan informasi "
-    "pengiriman yang dimasukkan."
+    "Aplikasi untuk membantu staf operasional hub "
+    "mengidentifikasi paket yang berisiko mengalami "
+    "keterlambatan berdasarkan informasi pada saat pickup."
+)
+
+st.caption(
+    f"Model: {metadata['nama_model']} | "
+    f"Versi: {metadata['versi_model']} | "
+    f"Threshold: {THRESHOLD:.0%}"
 )
 
 st.divider()
 
 
-# =====================================================
-# INFORMASI MODEL
-# =====================================================
+# =========================================================
+# 6. INPUT DATA PAKET
+# =========================================================
 
-with st.expander("Informasi Model"):
-    col1, col2, col3 = st.columns(3)
+st.subheader("Input Data Paket")
 
-    col1.metric(
-        "Nama Model",
-        meta["nama_model"]
+
+# ---------------------------------------------------------
+# INFORMASI PICKUP
+# ---------------------------------------------------------
+
+st.markdown("#### Informasi Pickup")
+
+col1, col2 = st.columns(2)
+
+with col1:
+
+    tanggal_pickup = st.date_input(
+        "Tanggal Pickup"
     )
 
-    col2.metric(
-        "Threshold",
-        f"{THRESHOLD:.2f}"
+    jam_pickup = st.number_input(
+        "Jam Pickup",
+        min_value=7,
+        max_value=22,
+        value=10,
+        step=1
     )
 
-    col3.metric(
-        "Recall Test",
-        f"{meta['metrik_test']['recall']:.3f}"
+    kota_tujuan = st.selectbox(
+        "Kota Tujuan",
+        [
+            "Bekasi",
+            "Bogor",
+            "Jakarta",
+            "Yogyakarta",
+            "Surabaya",
+            "Medan",
+            "Denpasar",
+            "Bali",
+            "Balikpapan",
+            "Cirebon",
+            "Makassar",
+            "Malang",
+            "Palembang",
+            "Pontianak",
+            "Semarang",
+            "Tasikmalaya"
+        ]
     )
 
-    st.caption(
-        f"Versi model: {meta['versi_model']} | "
-        f"Tanggal dibuat: {meta['dibuat']}"
+with col2:
+
+    layanan = st.selectbox(
+        "Jenis Layanan",
+        [
+            "REG",
+            "EXPRESS",
+            "HEMAT"
+        ]
+    )
+
+    janji_hari = st.number_input(
+        "Estimasi Pengiriman (Hari)",
+        min_value=1,
+        max_value=6,
+        value=3,
+        step=1
+    )
+
+    metode_bayar = st.selectbox(
+        "Metode Pembayaran",
+        [
+            "COD",
+            "non_COD"
+        ]
     )
 
 
-# =====================================================
-# INPUT PENGIRIMAN
-# =====================================================
+# ---------------------------------------------------------
+# INFORMASI PAKET
+# ---------------------------------------------------------
 
-st.subheader("Masukkan Informasi Pengiriman")
+st.markdown("#### Informasi Paket")
 
-# Checkbox harus di luar form agar perubahan status
-# langsung memperbarui kolom jarak.
+col3, col4 = st.columns(2)
 
-jarak_tidak_diketahui = st.checkbox(
-    "Jarak pengiriman tidak diketahui"
-)
+with col3:
 
+    # Checkbox tepat di atas kolom jarak
+    tidak_tahu_jarak = st.checkbox(
+        "Jarak pengiriman tidak diketahui"
+    )
 
-with st.form("form_prediksi"):
+    # Jika checkbox dicentang
+    if tidak_tahu_jarak:
 
-    # ---------------------------------------------
-    # INFORMASI WAKTU
-    # ---------------------------------------------
+        jarak_km = None
 
-    st.markdown("### 🕒 Informasi Waktu")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        tanggal_pickup = st.date_input(
-            "Tanggal Pickup",
-            value=date.today()
+        st.text_input(
+            "Jarak Pengiriman (km)",
+            value="Unable",
+            disabled=True
         )
 
-    with col2:
-        jam_pickup = st.number_input(
-            "Jam Pickup",
-            min_value=7.0,
-            max_value=22.0,
-            value=10.0,
-            step=0.5
-        )
+    # Jika checkbox tidak dicentang
+    else:
 
-    st.divider()
-
-    # ---------------------------------------------
-    # INFORMASI TUJUAN
-    # ---------------------------------------------
-
-    st.markdown("### 📍 Informasi Tujuan")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        kota_tujuan = st.selectbox(
-            "Kota Tujuan",
-            options=KOTA
-        )
-
-    with col2:
         jarak_km = st.number_input(
             "Jarak Pengiriman (km)",
-            min_value=0.0,
+            min_value=0.1,
             max_value=2500.0,
             value=100.0,
-            step=1.0,
-            disabled=jarak_tidak_diketahui
-        )
-
-    st.divider()
-
-    # ---------------------------------------------
-    # INFORMASI PAKET
-    # ---------------------------------------------
-
-    st.markdown("### 📦 Informasi Paket")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        layanan = st.selectbox(
-            "Jenis Layanan",
-            options=LAYANAN
-        )
-
-    with col2:
-        janji_hari = st.number_input(
-            "Estimasi Janji Pengiriman (hari)",
-            min_value=1,
-            max_value=6,
-            value=3,
-            step=1
+            step=10.0
         )
 
     berat_kg = st.number_input(
         "Berat Paket (kg)",
         min_value=0.0,
-        value=2.5,
+        value=1.0,
         step=0.1
     )
 
-    st.divider()
 
-    # ---------------------------------------------
-    # INFORMASI TAMBAHAN
-    # ---------------------------------------------
+with col4:
 
-    st.markdown("### 🌦️ Informasi Tambahan")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        metode_bayar = st.selectbox(
-            "Metode Pembayaran",
-            options=METODE_BAYAR
-        )
-
-    with col2:
-        cuaca = st.selectbox(
-            "Cuaca Saat Pickup",
-            options=CUACA
-        )
-
-    st.divider()
-
-    tombol_prediksi = st.form_submit_button(
-        "Prediksi Keterlambatan",
-        use_container_width=True
+    cuaca = st.selectbox(
+        "Cuaca Saat Pickup",
+        [
+            "cerah",
+            "berawan",
+            "hujan_ringan",
+            "hujan_lebat",
+            "tidak_diketahui"
+        ]
     )
 
 
-# =====================================================
-# PROSES PREDIKSI
-# =====================================================
+# ---------------------------------------------------------
+# INFORMASI OPERASIONAL HUB
+# ---------------------------------------------------------
+
+st.markdown("#### Informasi Operasional Hub")
+
+col5, col6 = st.columns(2)
+
+with col5:
+
+    jumlah_transit = st.number_input(
+        "Jumlah Transit",
+        min_value=0,
+        value=2,
+        step=1
+    )
+
+with col6:
+
+    volume_hub_hari = st.number_input(
+        "Volume Paket Hub per Hari",
+        min_value=2800,
+        max_value=18000,
+        value=8000,
+        step=100
+    )
+
+
+st.caption(
+    "Jumlah transit merupakan perkiraan jumlah titik transit "
+    "yang akan dilalui paket. Volume hub merupakan jumlah "
+    "paket yang diperkirakan ditangani saat pickup, bukan "
+    "volume aktual pada akhir hari."
+)
+
+st.divider()
+
+
+# =========================================================
+# 7. TOMBOL PREDIKSI
+# =========================================================
+
+tombol_prediksi = st.button(
+    "🔍 Prediksi Keterlambatan",
+    use_container_width=True
+)
+
+
+# =========================================================
+# 8. PROSES HASIL PREDIKSI
+# =========================================================
 
 if tombol_prediksi:
 
-    # ---------------------------------------------
-    # MEMBUAT REQUEST
-    # ---------------------------------------------
-
+    # Membuat request
     request = {
-        "tanggal_pickup": tanggal_pickup.isoformat(),
+        "tanggal_pickup": str(tanggal_pickup),
         "jam_pickup": jam_pickup,
         "kota_tujuan": kota_tujuan,
-        "jarak_km": None if jarak_tidak_diketahui else jarak_km,
+        "jarak_km": jarak_km,
         "layanan": layanan,
         "janji_hari": janji_hari,
         "berat_kg": berat_kg,
         "metode_bayar": metode_bayar,
-        "cuaca_saat_pickup": cuaca
+        "cuaca_saat_pickup": cuaca,
+        "jumlah_transit": jumlah_transit,
+        "volume_hub_hari": volume_hub_hari
     }
-
-    # ---------------------------------------------
-    # VALIDASI INPUT
-    # ---------------------------------------------
-
-    masalah, peringatan = periksa_request(request)
-
-    if masalah:
-
-        st.error("Terdapat kesalahan pada input:")
-
-        for item in masalah:
-            st.write(f"- {item}")
-
-        st.stop()
-
-    # ---------------------------------------------
-    # PERINGATAN INPUT
-    # ---------------------------------------------
-
-    for item in peringatan:
-        st.warning(item)
-
-    # ---------------------------------------------
-    # IMPUTASI JARAK
-    # ---------------------------------------------
-
-    if (
-        request["jarak_km"] is None
-        or request["jarak_km"] <= 0
-    ):
-
-        rata_rata_kota = MEDIAN_JARAK_KOTA.get(
-            kota_tujuan,
-            MEDIAN_JARAK_GLOBAL
-        )
-
-        request["jarak_km"] = rata_rata_kota
-
-        st.info(
-            f"Jarak tidak diketahui. Sistem menggunakan "
-            f"median jarak kota {kota_tujuan}: "
-            f"{rata_rata_kota:.2f} km."
-        )
-
-    # ---------------------------------------------
-    # MEMBUAT DATAFRAME
-    # ---------------------------------------------
-
-    df_input = pd.DataFrame([request])
-
-    # ---------------------------------------------
-    # FEATURE ENGINEERING
-    # ---------------------------------------------
-
-    data_input = tambah_fitur(df_input)
-
-    # ---------------------------------------------
-    # PREDIKSI PROBABILITAS
-    # ---------------------------------------------
 
     try:
 
-        probabilitas = model.predict_proba(data_input)[0]
+        hasil, masalah, peringatan = proses_prediksi(request)
 
-        kelas_model = list(model.classes_)
+        # -------------------------------------------------
+        # VALIDASI INPUT
+        # -------------------------------------------------
 
-        indeks_terlambat = kelas_model.index(1)
+        if masalah:
 
-        probabilitas_terlambat = probabilitas[
-            indeks_terlambat
-        ]
+            st.error("Data belum dapat diproses.")
 
-        # -----------------------------------------
-        # KLASIFIKASI BERDASARKAN THRESHOLD
-        # -----------------------------------------
-
-        if probabilitas_terlambat >= THRESHOLD:
-
-            status = "BERPOTENSI TERLAMBAT"
-            warna = "error"
+            for item in masalah:
+                st.write(f"- {item}")
 
         else:
 
-            status = "RISIKO KETERLAMBATAN RENDAH"
-            warna = "success"
+            # Menampilkan peringatan
+            for item in peringatan:
+                st.warning(item)
 
-        # -----------------------------------------
-        # PRIORITAS PENANGANAN
-        # -----------------------------------------
+            st.divider()
 
-        if probabilitas_terlambat >= BATAS_PRIORITAS:
+            # -------------------------------------------------
+            # HASIL PREDIKSI
+            # -------------------------------------------------
 
-            prioritas = "PRIORITAS TINGGI"
+            st.subheader("Hasil Prediksi")
 
-        else:
+            probabilitas = hasil["probabilitas"]
 
-            prioritas = "PRIORITAS NORMAL"
+            col1, col2, col3 = st.columns(3)
 
-        # -----------------------------------------
-        # HASIL PREDIKSI
-        # -----------------------------------------
+            with col1:
 
-        st.divider()
+                st.metric(
+                    "Probabilitas Terlambat",
+                    f"{probabilitas:.2%}"
+                )
 
-        st.subheader("📊 Hasil Prediksi")
+            with col2:
 
-        col1, col2 = st.columns(2)
+                st.metric(
+                    "Threshold Model",
+                    f"{THRESHOLD:.0%}"
+                )
 
-        with col1:
+            with col3:
 
-            st.metric(
-                "Probabilitas Keterlambatan",
-                f"{probabilitas_terlambat * 100:.2f}%"
+                st.metric(
+                    "Jarak yang Digunakan",
+                    f"{hasil['jarak_digunakan']:.1f} km"
+                )
+
+            # Progress bar probabilitas
+            st.progress(
+                float(probabilitas),
+                text="Tingkat Risiko Keterlambatan"
             )
 
-        with col2:
+            # -------------------------------------------------
+            # REKOMENDASI TINDAKAN
+            # -------------------------------------------------
 
-            st.metric(
-                "Threshold Klasifikasi",
-                f"{THRESHOLD * 100:.0f}%"
+            if hasil["rekomendasi"] == "PRIORITAS TINGGI":
+
+                st.error(
+                    f"🚨 {hasil['rekomendasi']}"
+                )
+
+            elif hasil["rekomendasi"] == "KABARI PELANGGAN":
+
+                st.warning(
+                    f"⚠️ {hasil['rekomendasi']}"
+                )
+
+            else:
+
+                st.success(
+                    f"✅ {hasil['rekomendasi']}"
+                )
+
+            st.write(hasil["keterangan"])
+
+            # -------------------------------------------------
+            # INFORMASI IMPUTASI JARAK
+            # -------------------------------------------------
+
+            if hasil["jarak_diimputasi"]:
+
+                st.info(
+                    f"Jarak tidak diketahui. Sistem menggunakan "
+                    f"{hasil['sumber_jarak']} sebesar "
+                    f"{hasil['jarak_digunakan']:.1f} km."
+                )
+
+            # -------------------------------------------------
+            # CATATAN PREDIKSI
+            # -------------------------------------------------
+
+            st.caption(
+                "Hasil prediksi merupakan estimasi berdasarkan "
+                "model machine learning, bukan kepastian bahwa "
+                "paket akan mengalami keterlambatan."
             )
-
-        st.progress(
-            float(probabilitas_terlambat)
-        )
-
-        if warna == "error":
-
-            st.error(f"⚠️ {status}")
-
-        else:
-
-            st.success(f"✅ {status}")
-
-        # -----------------------------------------
-        # PRIORITAS
-        # -----------------------------------------
-
-        st.markdown("### Tingkat Prioritas Penanganan")
-
-        if prioritas == "PRIORITAS TINGGI":
-
-            st.warning(
-                "🔴 PRIORITAS TINGGI — Paket perlu "
-                "mendapatkan perhatian lebih."
-            )
-
-        else:
-
-            st.info(
-                "🟢 PRIORITAS NORMAL — Paket belum "
-                "memenuhi batas prioritas tinggi."
-            )
-
-        # -----------------------------------------
-        # INFORMASI INPUT
-        # -----------------------------------------
-
-        with st.expander("Lihat Detail Data Pengiriman"):
-
-            st.write({
-                "Tanggal Pickup": request["tanggal_pickup"],
-                "Jam Pickup": request["jam_pickup"],
-                "Kota Tujuan": request["kota_tujuan"],
-                "Jarak (km)": request["jarak_km"],
-                "Layanan": request["layanan"],
-                "Janji Pengiriman (hari)": request["janji_hari"],
-                "Berat (kg)": request["berat_kg"],
-                "Metode Pembayaran": request["metode_bayar"],
-                "Cuaca": request["cuaca_saat_pickup"]
-            })
 
     except Exception as e:
 
@@ -479,4 +522,15 @@ if tombol_prediksi:
             f"Terjadi kesalahan saat melakukan prediksi: {e}"
         )
 
-        st.exception(e)
+
+# =========================================================
+# 9. FOOTER
+# =========================================================
+
+st.divider()
+
+st.caption(
+    "Sistem Prediksi Keterlambatan Paket | "
+    f"Model {metadata['versi_model']} | "
+    f"Dibuat pada {metadata['dibuat']}"
+)
