@@ -1,11 +1,11 @@
 # Prediksi Keterlambatan Paket · Tim [wiwuwiwu]
 
-**Kasus:** 08, Prediksi Keterlambatan Paket Hub Bandung (klasifikasi biner & estimasi probabilitas, metrik utama PR-AUC) · **Aplikasi:** [Isi Tautan Streamlit] · **Video:** [Isi Tautan Video Demo]
+**Kasus:** 08, Prediksi Keterlambatan Paket Hub Bandung (klasifikasi biner & estimasi probabilitas, metrik utama PR-AUC) · **Aplikasi:** (https://prediksipaketterlambat.streamlit.app/) · **Video:** [Isi Tautan Video Demo]
 
 | Anggota | NIM | Bagian yang dikerjakan |
 | :--- | :--- | :--- |
 | Muhammad Thoriq Salahudin Haryoto (`Felixriq`) | [2403154] | [Isi bagian yang dikerjakan] |
-| Sekar Ayu Kinanti (`sekar321`) | [Isi NIM] | [Isi bagian yang dikerjakan] |
+| Sekar Ayu Kinanti (`sekar321`) | [2404201] | [Isi bagian yang dikerjakan] |
 
 ## Masalah dan Pengguna
 
