@@ -1,22 +1,63 @@
-# Prediksi Keterlambatan Paket · TIM Asoy [Hub Bandung]
-Kasus: 08, Prediksi Keterlambatan Paket Hub Bandung (klasifikasi biner & estimasi probabilitas, metrik utama PR-AUC) · Aplikasi: [Isi Tautan Streamlit] · Video: [Isi Tautan Video Demo]
+# Prediksi Keterlambatan Paket · Tim [wiwuwiwu]
 
-AnggotaNIMBagian yang dikerjakanMuhammad Thoriq Salahudin Haryoto (Felixriq)[Isi NIM][Isi bagian yang dikerjakan]Sekar Ayu Kinanti (sekar321)[Isi NIM][Isi bagian yang dikerjakan]
+**Kasus:** 08, Prediksi Keterlambatan Paket Hub Bandung (klasifikasi biner & estimasi probabilitas, metrik utama PR-AUC) · **Aplikasi:** [Isi Tautan Streamlit] · **Video:** [Isi Tautan Video Demo]
 
-Aplikasi prediksi probabilitas keterlambatan pengiriman paket saat *pickup* di Hub Bandung beserta rekomendasi tindakan operasional (**AMAN**, **KABARI PELANGGAN**, atau **PRIORITASKAN + KABARI PELANGGAN**). Proyek ini telah disesuaikan sepenuhnya dengan notebook **`08_keterlambatan_paket_revisi_3.ipynb`**.
+| Anggota | NIM | Bagian yang dikerjakan |
+| :--- | :--- | :--- |
+| Muhammad Thoriq Salahudin Haryoto (`Felixriq`) | [Isi NIM] | [Isi bagian yang dikerjakan] |
+| Sekar Ayu Kinanti (`sekar321`) | [Isi NIM] | [Isi bagian yang dikerjakan] |
 
-## Struktur Direktori & File
-- `src/features.py` : Modul pembersihan data, normalisasi kota/layanan, rekayasa 17 fitur (`tambah_fitur`), serta validasi masukan (`periksa_request`).
-- `artifacts/model.joblib` : Pipeline model final **Logistic Regression + fitur** (`StandardScaler` + `OneHotEncoder` + `LogisticRegression`).
-- `artifacts/metadata.json` — Metadata model (`versi_model: 1.0.0`, `threshold: 0.11`, `batas_prioritas: 0.50`, daftar 11 `fitur_request`, metrik validasi & test, serta asumsi biaya `FN: Rp50.000` dan `FP: Rp5.000`).
-- `core.py` : Modul integrasi model, `rekomendasi()`, dan `prediksi(request)`.
-- `streamlit_app.py` : Antarmuka web interaktif berbasis **Streamlit** (siap di-deploy ke **Streamlit Community Cloud**).
-- `app.py` : Antarmuka web lokal berbasis **Flask** (`http://127.0.0.1:5000` dan endpoint `POST /api/predict`).
-- `requirements.txt` : Daftar pustaka Python untuk deployment lokal maupun Streamlit Cloud.
-- `push_ke_github.bat` : Skrip otomatis untuk melakukan commit dan push seluruh pembaruan ke repositori GitHub `Felixriq/prediksi-keterlambatan-paket`.
+## Masalah dan Pengguna
 
-## Ringkasan Evaluasi Model
-- **Model Terpilih**: `Logistic Regression + fitur`
-- **PR-AUC Validation**: `0.662` (Baseline Regresi Logistik: `0.646`)
-- **PR-AUC Test**: `0.378` (Recall: `0.772`, Precision: `0.238`)
-- **Threshold Terbaik**: `0.11` (Biaya minimum validasi Rp19.465.000; biaya test Rp22.290.000 — turun 52% dibanding tanpa model Rp46.950.000)
+Pengelola operasional Hub Bandung perlu mengetahui risiko keterlambatan pengiriman paket sejak saat *pickup* agar dapat mengambil tindakan dini (**AMAN**, **KABARI PELANGGAN**, atau **PRIORITASKAN + KABARI PELANGGAN**) dan menekan biaya penalti keterlambatan. Aplikasi memprediksi probabilitas keterlambatan dari 11 masukan *request*: `tanggal_pickup`, `jam_pickup`, `kota_tujuan`, `jarak_km`, `layanan`, `janji_hari`, `berat_kg`, `metode_bayar`, `cuaca_saat_pickup`, `jumlah_transit`, dan `volume_hub_hari`.
+
+## Aturan Brief yang Dipatuhi
+
+- Tidak memakai data masa depan; seluruh fitur masukan diturunkan dari informasi yang tersedia saat *pickup*.
+- Pembagian berdasarkan waktu (*temporal split*): train `< 2026-01-01` (26.633 baris, 17,8% terlambat), validation Jan–Mar 2026 (6.623 baris, 21,9% terlambat), test Apr–Jun 2026 (6.744 baris, 13,9% terlambat).
+- Baseline wajib: Regresi Logistik dasar tanpa rekayasa fitur tambahan (PR-AUC validation `0,646`, PR-AUC test `0,356`).
+- Test set dibuka satu kali di akhir; model tidak diubah setelahnya.
+
+## Data dan Pembersihan
+
+Data mentah awal berisi 40.500 baris × 13 kolom (periode 1 Jan 2025 – 30 Jun 2026), menjadi 40.000 baris bersih setelah penghapusan 500 baris duplikat. Prapemrosesan dan rekayasa fitur di `src/features.py` menangani:
+
+| Masalah / Transformasi | Cara menangani |
+| :--- | :--- |
+| Penulisan kota & layanan beragam | Normalisasi 15 kota tujuan (`MAPPING_KOTA`) dan format layanan |
+| Jarak kosong (`jarak_km`) | Imputasi median jarak per kota (`JARAK_KOTA`) atau median global `356,0` km |
+| Pencilan volume hub | Pemotongan (*clipping*) `volume_hub_hari` di atas `18.000` |
+| Satuan berat tidak seragam | Konversi berat `>= 100` gram ke kilogram (`berat_kg`) |
+| Rekayasa fitur operasional | Penambahan 7 fitur (`after_cutoff`, `senin`, `slack`, `hari_per_1000km`, `surge`, `log_vol`, `hujan_lebat`) menjadi total 17 fitur |
+| Validasi masukan aplikasi | Pemeriksaan batas dan tipe input melalui `periksa_request` |
+
+## Model
+
+Pipeline `StandardScaler` (13 fitur numerik) + `OneHotEncoder` (4 fitur kategorikal) + `LogisticRegression` (`Logistic Regression + fitur`, versi `1.0.0`). Model ini dipilih karena mengungguli baseline Regresi Logistik dasar pada validasi (PR-AUC `0,662` vs `0,646`).
+
+Penentuan aksi operasional menggunakan dua ambang batas (lihat `artifacts/metadata.json`):
+
+- **`threshold = 0,11`**: batas klasifikasi terlambat (dioptimalkan untuk menekan biaya dengan asumsi penalti `FN = Rp50.000` dan `FP = Rp5.000`). Probabilitas `>= 0,11` memicu rekomendasi **KABARI PELANGGAN**.
+- **`batas_prioritas = 0,50`**: probabilitas `>= 0,50` memicu rekomendasi **PRIORITASKAN + KABARI PELANGGAN**.
+
+## Hasil
+
+Metrik utama: **PR-AUC** (makin besar makin baik), disertai evaluasi biaya operasional (`FN = Rp50.000`, `FP = Rp5.000`).
+
+| Model | PR-AUC Validation | PR-AUC Test |
+| :--- | :---: | :---: |
+| Baseline: Regresi Logistik dasar | `0,646` | `0,356` |
+| **Logistic Regression + fitur (v1.0.0)** | **`0,662`** | **`0,378`** |
+
+- Pada test set: Recall `0,772` (725/939 paket terlambat terdeteksi), Precision `0,238`.
+- Biaya operasional pada test set dengan model sebesar **Rp22.290.000**, turun **52,5%** dibanding skenario tanpa model (**Rp46.950.000**); biaya minimum pada validasi tercatat **Rp19.465.000**.
+
+## Cara Menjalankan
+
+```bash
+git clone [https://github.com/Felixriq/APK-Keterlambatan-paket.git](https://github.com/Felixriq/APK-Keterlambatan-paket.git)
+cd APK-Keterlambatan-paket
+python -m venv .venv
+.venv\Scripts\activate                   # Windows
+pip install -r requirements.txt
+streamlit run app.py                     # aplikasi Streamlit
