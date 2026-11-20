@@ -1,4 +1,7 @@
-# Kasus 08 · Prediksi Keterlambatan Paket (Hub Bandung)
+# Prediksi Keterlambatan Paket · TIM Asoy [Hub Bandung]
+Kasus: 08, Prediksi Keterlambatan Paket Hub Bandung (klasifikasi biner & estimasi probabilitas, metrik utama PR-AUC) · Aplikasi: [Isi Tautan Streamlit] · Video: [Isi Tautan Video Demo]
+
+AnggotaNIMBagian yang dikerjakanMuhammad Thoriq Salahudin Haryoto (Felixriq)[Isi NIM][Isi bagian yang dikerjakan]Sekar Ayu Kinanti (sekar321)[Isi NIM][Isi bagian yang dikerjakan]
 
 Aplikasi prediksi probabilitas keterlambatan pengiriman paket saat *pickup* di Hub Bandung beserta rekomendasi tindakan operasional (**AMAN**, **KABARI PELANGGAN**, atau **PRIORITASKAN + KABARI PELANGGAN**). Proyek ini telah disesuaikan sepenuhnya dengan notebook **`08_keterlambatan_paket_revisi_3.ipynb`**.
 
