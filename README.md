@@ -4,7 +4,7 @@
 
 | Anggota | NIM | Bagian yang dikerjakan |
 | :--- | :--- | :--- |
-| Muhammad Thoriq Salahudin Haryoto (`Felixriq`) | [Isi NIM] | [Isi bagian yang dikerjakan] |
+| Muhammad Thoriq Salahudin Haryoto (`Felixriq`) | [2403154] | [Isi bagian yang dikerjakan] |
 | Sekar Ayu Kinanti (`sekar321`) | [Isi NIM] | [Isi bagian yang dikerjakan] |
 
 ## Masalah dan Pengguna
