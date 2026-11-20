@@ -89,5 +89,5 @@ README.md                # Dokumentasi proyek
 - [x] Data test hanya dibuka satu kali, di akhir
 - [x] `artifacts/metadata.json` berisi versi model, fitur masukan, threshold, dan metrik
 - [ ] Notebook (`08_keterlambatan_paket_revisi_3.ipynb`) dan pengujian otomatis (`tests/`) diunggah ke repositori
-- [ ] Tautan aplikasi Streamlit dan video demo dicantumkan di `README.md`
-- [ ] Laporan paling banyak 6 halaman dan video paling lama 5 menit
+- [x] Tautan aplikasi Streamlit dan video demo dicantumkan di `README.md`
+- [x] Laporan paling banyak 6 halaman dan video paling lama 5 menit
