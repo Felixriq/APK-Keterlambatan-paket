@@ -12,7 +12,7 @@ Aplikasi prediksi probabilitas keterlambatan pengiriman paket saat *pickup* di H
 - `requirements.txt` : Daftar pustaka Python untuk deployment lokal maupun Streamlit Cloud.
 - `push_ke_github.bat` : Skrip otomatis untuk melakukan commit dan push seluruh pembaruan ke repositori GitHub `Felixriq/prediksi-keterlambatan-paket`.
 
-## Ringkasan Evaluasi Model (Sesuai Notebook Revisi 3)
+## Ringkasan Evaluasi Model
 - **Model Terpilih**: `Logistic Regression + fitur`
 - **PR-AUC Validation**: `0.662` (Baseline Regresi Logistik: `0.646`)
 - **PR-AUC Test**: `0.378` (Recall: `0.772`, Precision: `0.238`)
