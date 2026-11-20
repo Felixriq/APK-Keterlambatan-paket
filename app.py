@@ -1,11 +1,10 @@
 
 import json
-import joblib
-import pandas as pd
+import os
+import requests
 import streamlit as st
 
 from pathlib import Path
-from src.features import tambah_fitur, periksa_request
 
 
 # =========================================================
@@ -20,31 +19,36 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).resolve().parent
 
-MODEL_PATH = BASE_DIR / "artifacts" / "model.joblib"
 METADATA_PATH = BASE_DIR / "artifacts" / "metadata.json"
 
+# Alamat API lokal.
+# Saat deployment, alamat ini akan diganti menggunakan
+# environment variable API_URL.
+
+API_URL = os.getenv(
+    "API_URL",
+    "http://127.0.0.1:8000"
+).rstrip("/")
+
 
 # =========================================================
-# 2. LOAD MODEL DAN METADATA
+# 2. LOAD METADATA
 # =========================================================
-
-@st.cache_resource
-def load_model():
-    return joblib.load(MODEL_PATH)
-
 
 @st.cache_data
 def load_metadata():
+
     with open(METADATA_PATH, "r", encoding="utf-8") as file:
         return json.load(file)
 
 
 try:
-    model = load_model()
+
     metadata = load_metadata()
 
 except Exception as e:
-    st.error(f"Gagal memuat model atau metadata: {e}")
+
+    st.error(f"Gagal memuat metadata: {e}")
     st.stop()
 
 
@@ -53,137 +57,10 @@ except Exception as e:
 # =========================================================
 
 THRESHOLD = float(metadata["threshold"])
-BATAS_PRIORITAS = float(metadata["batas_prioritas"])
-
-MEDIAN_JARAK_KOTA = metadata["median_jarak_kota"]
-MEDIAN_JARAK_GLOBAL = metadata["median_jarak_global"]
-
-FITUR_REQUEST = metadata["fitur_request"]
 
 
 # =========================================================
-# 4. FUNGSI PREPROCESSING DAN PREDIKSI
-# =========================================================
-
-def proses_prediksi(request):
-
-    # Membuat DataFrame sesuai fitur request
-    df = pd.DataFrame(
-        [request],
-        columns=FITUR_REQUEST
-    )
-
-    # Validasi data input
-    masalah, peringatan = periksa_request(request)
-
-    if masalah:
-        return None, masalah, peringatan
-
-    # Feature engineering
-    df_fitur = tambah_fitur(df)
-
-    # Mengambil kota tujuan yang sudah dinormalisasi
-    kota = df_fitur["kota_tujuan"].iloc[0]
-
-    # Menentukan median jarak berdasarkan kota
-    if kota in MEDIAN_JARAK_KOTA:
-        median_jarak = MEDIAN_JARAK_KOTA[kota]
-        sumber_jarak = f"Median kota {kota}"
-    else:
-        median_jarak = MEDIAN_JARAK_GLOBAL
-        sumber_jarak = "Median jarak global"
-
-    # Imputasi jarak jika tidak diketahui
-    jarak_diimputasi = pd.isna(request["jarak_km"])
-
-    df_fitur["jarak_km"] = df_fitur["jarak_km"].fillna(
-        median_jarak
-    )
-
-    # Menghitung ulang fitur turunan setelah imputasi
-    df_fitur["hari_per_1000km"] = (
-        df_fitur["janji_hari"] /
-        (df_fitur["jarak_km"] / 1000)
-    )
-
-    # Mengambil fitur sesuai Pipeline model
-    preprocessor = model.named_steps["preprocessor"]
-
-    fitur_numerik = list(
-        preprocessor.transformers_[0][2]
-    )
-
-    fitur_kategorikal = list(
-        preprocessor.transformers_[1][2]
-    )
-
-    fitur_model = fitur_numerik + fitur_kategorikal
-
-    X = df_fitur[fitur_model]
-
-    # Mengambil classifier
-    classifier = model.named_steps["classifier"]
-
-    # Memastikan kelas terlambat tersedia
-    kelas = list(classifier.classes_)
-
-    if 1 not in kelas:
-        raise ValueError(
-            "Model tidak memiliki kelas positif 1 (terlambat)."
-        )
-
-    indeks_terlambat = kelas.index(1)
-
-    # Menghitung probabilitas keterlambatan
-    probabilitas = model.predict_proba(X)[0][indeks_terlambat]
-
-    # Keputusan berdasarkan threshold
-    prediksi = int(probabilitas >= THRESHOLD)
-
-    # Menentukan rekomendasi
-    if probabilitas >= BATAS_PRIORITAS:
-
-        rekomendasi = "PRIORITAS TINGGI"
-
-        keterangan = (
-            "Paket memiliki risiko keterlambatan tinggi. "
-            "Segera lakukan tindak lanjut."
-        )
-
-    elif prediksi == 1:
-
-        rekomendasi = "KABARI PELANGGAN"
-
-        keterangan = (
-            "Paket terindikasi berisiko terlambat. "
-            "Informasikan potensi keterlambatan kepada pelanggan."
-        )
-
-    else:
-
-        rekomendasi = "PEMANTAUAN NORMAL"
-
-        keterangan = (
-            "Risiko keterlambatan berada di bawah threshold. "
-            "Paket dapat dipantau melalui proses operasional normal."
-        )
-
-    # Menyimpan hasil prediksi
-    hasil = {
-        "probabilitas": probabilitas,
-        "prediksi": prediksi,
-        "rekomendasi": rekomendasi,
-        "keterangan": keterangan,
-        "jarak_digunakan": df_fitur["jarak_km"].iloc[0],
-        "jarak_diimputasi": jarak_diimputasi,
-        "sumber_jarak": sumber_jarak
-    }
-
-    return hasil, masalah, peringatan
-
-
-# =========================================================
-# 5. HEADER APLIKASI
+# 4. HEADER APLIKASI
 # =========================================================
 
 st.title("📦 Sistem Prediksi Keterlambatan Paket")
@@ -204,7 +81,7 @@ st.divider()
 
 
 # =========================================================
-# 6. INPUT DATA PAKET
+# 5. INPUT DATA PAKET
 # =========================================================
 
 st.subheader("Input Data Paket")
@@ -292,23 +169,21 @@ col3, col4 = st.columns(2)
 
 with col3:
 
-    # Checkbox tepat di atas kolom jarak
+    # Checkbox untuk jarak yang tidak diketahui
     tidak_tahu_jarak = st.checkbox(
         "Jarak pengiriman tidak diketahui"
     )
 
-    # Jika checkbox dicentang
     if tidak_tahu_jarak:
 
         jarak_km = None
 
         st.text_input(
             "Jarak Pengiriman (km)",
-            value="Unable",
+            value="Tidak diketahui",
             disabled=True
         )
 
-    # Jika checkbox tidak dicentang
     else:
 
         jarak_km = st.number_input(
@@ -380,7 +255,7 @@ st.divider()
 
 
 # =========================================================
-# 7. TOMBOL PREDIKSI
+# 6. TOMBOL PREDIKSI
 # =========================================================
 
 tombol_prediksi = st.button(
@@ -390,13 +265,16 @@ tombol_prediksi = st.button(
 
 
 # =========================================================
-# 8. PROSES HASIL PREDIKSI
+# 7. PROSES PREDIKSI MELALUI API
 # =========================================================
 
 if tombol_prediksi:
 
-    # Membuat request
-    request = {
+    # -----------------------------------------------------
+    # MEMBUAT DATA REQUEST
+    # -----------------------------------------------------
+
+    request_data = {
         "tanggal_pickup": str(tanggal_pickup),
         "jam_pickup": jam_pickup,
         "kota_tujuan": kota_tujuan,
@@ -412,23 +290,62 @@ if tombol_prediksi:
 
     try:
 
-        hasil, masalah, peringatan = proses_prediksi(request)
-
         # -------------------------------------------------
-        # VALIDASI INPUT
+        # MENGIRIM DATA KE FASTAPI
         # -------------------------------------------------
 
-        if masalah:
+        with st.spinner("Sedang memproses prediksi..."):
 
-            st.error("Data belum dapat diproses.")
+            response = requests.post(
+                f"{API_URL}/predict",
+                json=request_data,
+                timeout=30
+            )
 
-            for item in masalah:
-                st.write(f"- {item}")
+        # Mengambil respons JSON
+        try:
+            hasil = response.json()
+
+        except ValueError:
+            hasil = {}
+
+        # -------------------------------------------------
+        # MENANGANI ERROR DARI API
+        # -------------------------------------------------
+
+        if response.status_code != 200:
+
+            detail = hasil.get(
+                "detail",
+                response.text
+            )
+
+            if isinstance(detail, dict):
+
+                st.error(
+                    detail.get(
+                        "pesan",
+                        "Data tidak dapat diproses."
+                    )
+                )
+
+                for item in detail.get("masalah", []):
+                    st.write(f"- {item}")
+
+                for item in detail.get("peringatan", []):
+                    st.warning(item)
+
+            else:
+
+                st.error(f"Prediksi gagal: {detail}")
 
         else:
 
-            # Menampilkan peringatan
-            for item in peringatan:
+            # -------------------------------------------------
+            # MENAMPILKAN PERINGATAN
+            # -------------------------------------------------
+
+            for item in hasil.get("peringatan", []):
                 st.warning(item)
 
             st.divider()
@@ -439,7 +356,7 @@ if tombol_prediksi:
 
             st.subheader("Hasil Prediksi")
 
-            probabilitas = hasil["probabilitas"]
+            probabilitas = float(hasil["probabilitas"])
 
             col1, col2, col3 = st.columns(3)
 
@@ -454,7 +371,7 @@ if tombol_prediksi:
 
                 st.metric(
                     "Threshold Model",
-                    f"{THRESHOLD:.0%}"
+                    f"{hasil['threshold']:.0%}"
                 )
 
             with col3:
@@ -466,7 +383,7 @@ if tombol_prediksi:
 
             # Progress bar probabilitas
             st.progress(
-                float(probabilitas),
+                min(max(probabilitas, 0.0), 1.0),
                 text="Tingkat Risiko Keterlambatan"
             )
 
@@ -507,7 +424,7 @@ if tombol_prediksi:
                 )
 
             # -------------------------------------------------
-            # CATATAN PREDIKSI
+            # STATUS PREDIKSI
             # -------------------------------------------------
 
             st.caption(
@@ -515,6 +432,29 @@ if tombol_prediksi:
                 "model machine learning, bukan kepastian bahwa "
                 "paket akan mengalami keterlambatan."
             )
+
+    # -----------------------------------------------------
+    # PENANGANAN KONEKSI API
+    # -----------------------------------------------------
+
+    except requests.exceptions.ConnectionError:
+
+        st.error(
+            "Tidak dapat terhubung ke API. "
+            "Pastikan FastAPI sedang berjalan."
+        )
+
+    except requests.exceptions.Timeout:
+
+        st.error(
+            "Waktu permintaan API habis. Silakan coba kembali."
+        )
+
+    except requests.exceptions.RequestException as e:
+
+        st.error(
+            f"Terjadi kesalahan komunikasi dengan API: {e}"
+        )
 
     except Exception as e:
 
@@ -524,7 +464,7 @@ if tombol_prediksi:
 
 
 # =========================================================
-# 9. FOOTER
+# 8. FOOTER
 # =========================================================
 
 st.divider()
