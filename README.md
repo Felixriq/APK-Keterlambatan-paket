@@ -54,11 +54,40 @@ Metrik utama: **PR-AUC** (makin besar makin baik), disertai evaluasi biaya opera
 
 ## Cara Menjalankan
 
-```bash
+```text
 git clone [https://github.com/Felixriq/APK-Keterlambatan-paket.git](https://github.com/Felixriq/APK-Keterlambatan-paket.git)
 cd APK-Keterlambatan-paket
 python -m venv .venv
 .venv\Scripts\activate                   # Windows
 pip install -r requirements.txt
 streamlit run app.py                     # aplikasi Streamlit
-tes
+```
+## Struktur Repositori
+
+```text
+artifacts/
+  ├── metadata.json      # Versi model, fitur request, threshold, dan metrik
+  └── model.joblib       # Pipeline model terlatih
+src/
+  └── features.py        # Pembersihan data, rekayasa fitur, dan validasi input
+app.py                   # Aplikasi web Streamlit
+requirements.txt         # Daftar dependensi Python
+push_ke_github.bat       # Skrip bantu push ke GitHub
+README.md                # Dokumentasi proyek
+```
+
+## Keterbatasan
+
+- Fitur `volume_hub_hari` berpotensi menimbulkan *temporal leakage* jika angkanya baru lengkap di akhir hari (bukan *running count* saat *pickup*); `JARAK_KOTA` juga dihitung sebelum pembagian data.
+- Precision pada test set relatif rendah (`0,238`) karena `threshold = 0,11` diprioritaskan untuk meminimalkan *False Negative* yang biayanya 10× lebih besar dari *False Positive*.
+- Data pelatihan hanya mencakup pengiriman dari Hub Bandung pada periode Jan 2025 – Jun 2026.
+
+## Daftar Periksa Sebelum Dikumpulkan
+
+- [x] Repositori bersifat publik dan kedua anggota memiliki commit
+- [x] Baseline wajib dilaporkan dan dibandingkan
+- [x] Data test hanya dibuka satu kali, di akhir
+- [x] `artifacts/metadata.json` berisi versi model, fitur masukan, threshold, dan metrik
+- [ ] Notebook (`08_keterlambatan_paket_revisi_3.ipynb`) dan pengujian otomatis (`tests/`) diunggah ke repositori
+- [ ] Tautan aplikasi Streamlit dan video demo dicantumkan di `README.md`
+- [ ] Laporan paling banyak 6 halaman dan video paling lama 5 menit
