@@ -1,11 +1,14 @@
-# Prediksi Keterlambatan Paket · Tim [wiwuwiwu]
+# Prediksi Keterlambatan Paket · Tim [08]
 
 **Kasus:** 08, Prediksi Keterlambatan Paket Hub Bandung (klasifikasi biner & estimasi probabilitas, metrik utama PR-AUC) · **Aplikasi:** (https://prediksipaketterlambat.streamlit.app/) · **Video:** [Isi Tautan Video Demo]
 
 | Anggota | NIM | Bagian yang dikerjakan |
 | :--- | :--- | :--- |
 | Muhammad Thoriq Salahudin Haryoto (`Felixriq`) | [2403154] | [Isi bagian yang dikerjakan] |
-| Sekar Ayu Kinanti (`sekar321`) | [2404201] | [Isi bagian yang dikerjakan] |
+| Sekar Ayu Kinanti (`sekar321`) | [2404201] | [•	Perbaikan kode program pengembangan model di Google Colab.
+•	Pengembangan API lokal, serta pembuatan serta aplikasi berbasis Streamlit yang terintegrasi dengan API local.
+•	Deployment aplikasi Streamlit berbasis model Joblib agar dapat diakses secara online tanpa memerlukan koneksi ke API.
+] |
 
 ## Masalah dan Pengguna
 
