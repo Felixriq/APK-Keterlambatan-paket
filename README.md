@@ -4,7 +4,7 @@
 
 | Anggota | NIM | Bagian yang dikerjakan |
 | :--- | :--- | :--- |
-| Muhammad Thoriq Salahudin Haryoto (`Felixriq`) | [2403154] | • Dokumentasi Repositori (README.md): Penyusunan dokumentasi proyek prediksi keterlambatan paket Hub Bandung yang mencakup gambaran umum sistem, struktur proyek, dan panduan instalasi/eksekusi.
+| Muhammad Thoriq Salahudin Haryoto (`Felixriq`) | [2403154] | • Dokumentasi Repositori (README.md): Penyusunan dokumentasi proyek prediksi keterlambatan paket Hub Bandung yang mencakup gambaran umum sistem, struktur proyek, dan panduan instalasi/eksekusi.<br><br>
 • Audit Data Leakage & Feature Engineering: Evaluasi kebocoran data (data leakage) termasuk peninjauan dan penghapusan fitur volume yang sebelumnya membuat metrik PR-AUC bias—serta pemanfaatan fitur jarak antarkota (JARAK_KOTA).
 •Skrip & Materi Video Presentasi (Walk-through 3 Menit): Penyusunan naskah 4 segmen beserta teks screen overlay yang membahas distribusi target, data cleaning & split, perbandingan model dan cost curves, top features, format output JSON, serta keterbatasan model.|
 | Sekar Ayu Kinanti (`sekar321`) | [2404201] | •	Perbaikan kode program pengembangan model di Google Colab.<br><br>•	Pengembangan API lokal, serta pembuatan aplikasi berbasis Streamlit yang terintegrasi dengan API local.<br><br>•	Deployment aplikasi Streamlit berbasis model Joblib agar dapat diakses secara online tanpa memerlukan koneksi ke API. |
