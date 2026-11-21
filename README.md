@@ -5,7 +5,7 @@
 | Anggota | NIM | Bagian yang dikerjakan |
 | :--- | :--- | :--- |
 | Muhammad Thoriq Salahudin Haryoto (`Felixriq`) | [2403154] | [Isi bagian yang dikerjakan] |
-| Sekar Ayu Kinanti (`sekar321`) | [2404201] | [•	Perbaikan kode program pengembangan model di Google Colab.<br><br>•	Pengembangan API lokal, serta pembuatan serta aplikasi berbasis Streamlit yang terintegrasi dengan API local.<br><br>•	Deployment aplikasi Streamlit berbasis model Joblib agar dapat diakses secara online tanpa memerlukan koneksi ke API.] |
+| Sekar Ayu Kinanti (`sekar321`) | [2404201] | •	Perbaikan kode program pengembangan model di Google Colab.<br><br>•	Pengembangan API lokal, serta pembuatan serta aplikasi berbasis Streamlit yang terintegrasi dengan API local.<br><br>•	Deployment aplikasi Streamlit berbasis model Joblib agar dapat diakses secara online tanpa memerlukan koneksi ke API. |
 
 ## Masalah dan Pengguna
 
